@@ -2,12 +2,19 @@ import telebot
 from telebot import types
 import time
 import os
-# ТВОЙ ТОКЕН
-import os
-TOKEN = os.getenv('BOT_TOKEN')
+
+# ТОКЕН БЕРЁМ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ
+TOKEN = os.environ.get('BOT_TOKEN')
+
+# Проверка, что токен загрузился (для отладки)
+if TOKEN is None:
+    print("❌ ОШИБКА: Токен не найден в переменных окружения!")
+    exit(1)
+else:
+    print(f"✅ Токен загружен: {TOKEN[:10]}...")
 
 # ID ТВОЕГО КАНАЛА
-CHANNEL_ID = '@netvoipsiholog'  # или числовой ID канала
+CHANNEL_ID = '@netvoipsiholog'
 
 # ПРАКТИКИ И ТЕСТЫ (разбиты по категориям)
 PRACTICES = {
@@ -68,7 +75,8 @@ def check_subscription(user_id):
     try:
         member = bot.get_chat_member(CHANNEL_ID, user_id)
         return member.status in ['creator', 'administrator', 'member']
-    except:
+    except Exception as e:
+        print(f"Ошибка проверки подписки: {e}")
         return False
 
 # Кнопка с ссылкой на канал
@@ -96,13 +104,11 @@ def main_menu():
 # Меню с практиками
 def practices_menu():
     markup = types.InlineKeyboardMarkup(row_width=1)
-    # Добавляем только практики
     for practice_id, practice in PRACTICES.items():
         if practice['category'] == 'practices':
             btn = types.InlineKeyboardButton(practice['name'], callback_data=f"item_{practice_id}")
             markup.add(btn)
     
-    # Кнопка возврата в главное меню
     back_btn = types.InlineKeyboardButton("◀️ В главное меню", callback_data="back_to_main")
     markup.add(back_btn)
     return markup
@@ -110,13 +116,11 @@ def practices_menu():
 # Меню с тестами
 def tests_menu():
     markup = types.InlineKeyboardMarkup(row_width=1)
-    # Добавляем только тесты
     for test_id, test in PRACTICES.items():
         if test['category'] == 'tests':
             btn = types.InlineKeyboardButton(test['name'], callback_data=f"item_{test_id}")
             markup.add(btn)
     
-    # Кнопка возврата в главное меню
     back_btn = types.InlineKeyboardButton("◀️ В главное меню", callback_data="back_to_main")
     markup.add(back_btn)
     return markup
@@ -127,7 +131,6 @@ def send_welcome(message):
     user_id = message.from_user.id
     first_name = message.from_user.first_name
     
-    # Проверяем, есть ли в команде параметр (котиковое слово из TikTok)
     args = message.text.split()
     ref_source = "TikTok" if len(args) > 1 else "прямого перехода"
     
@@ -218,7 +221,6 @@ def item_callback(call):
 
 [🔗 Перейти к {category_text}]({item['link']})"""
         
-        # Кнопки для навигации
         markup = types.InlineKeyboardMarkup(row_width=2)
         
         if item['category'] == 'practices':
@@ -318,5 +320,6 @@ def show_menu(message):
         )
 
 # Запуск бота
-print("🚀 Бот с практиками и тестами запущен...")
-bot.infinity_polling()
+if __name__ == '__main__':
+    print("🚀 Бот с практиками и тестами запущен...")
+    bot.infinity_polling()
