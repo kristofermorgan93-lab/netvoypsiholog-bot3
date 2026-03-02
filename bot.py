@@ -26,7 +26,7 @@ PRACTICES = {
     },
     'transformation_map': {
         'name': '🧭 Карта Трансформации',
-        'link': 'https://t.me/netvoipsiholog/30',
+        'link': 't.me/netvoipsiholog/30',
         'category': 'practices'
     },
     'year_closure': {
@@ -319,10 +319,8 @@ def show_menu(message):
             reply_markup=subscription_button()
         )
 
-# Запуск бота
-if __name__ == '__main__':
-    print("🚀 Бот с практиками и тестами запущен...")
-    @bot.message_handler(content_types=['document', 'audio', 'photo', 'video', 'voice'])
+# ===== НОВАЯ ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ FILE_ID =====
+@bot.message_handler(content_types=['document', 'audio', 'photo', 'video', 'voice'])
 def handle_files(message):
     """Получение file_id от любого файла (только для админа)"""
     # Проверяем, что это админ (твой ID)
@@ -371,4 +369,9 @@ def handle_files(message):
         response += f"📎 *File ID:* `{file_id}`\n\n"
         response += f"`{file_id}`"
     
-    bot.reply_to(message, response, parse_mode='Markdown')bot.infinity_polling()
+    bot.reply_to(message, response, parse_mode='Markdown')
+
+# ===== ЗАПУСК БОТА =====
+if __name__ == '__main__':
+    print("🚀 Бот с практиками и тестами запущен...")
+    bot.infinity_polling()
