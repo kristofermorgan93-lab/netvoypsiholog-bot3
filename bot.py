@@ -91,13 +91,18 @@ def subscription_button():
     markup.add(check_btn)
     return markup
 
-# Главное меню (выбор категории)
+# ===== ИСПРАВЛЕННОЕ ГЛАВНОЕ МЕНЮ =====
 def main_menu():
-    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    test_btn = types.InlineKeyboardButton("🧪 Пройти тест на созависимость", callback_data="start_test")
     practices_btn = types.InlineKeyboardButton("🧘 Практики", callback_data="category_practices")
-    tests_btn = types.InlineKeyboardButton("📊 Тесты", callback_data="category_tests")
+    tests_btn = types.InlineKeyboardButton("📊 Другие тесты", callback_data="category_tests")
     info_btn = types.InlineKeyboardButton("ℹ️ О канале", callback_data="info")
+    buy_btn = types.InlineKeyboardButton("💰 Купить гайд", callback_data="show_payment_options")
+    
+    markup.add(test_btn)
     markup.add(practices_btn, tests_btn)
+    markup.add(buy_btn)
     markup.add(info_btn)
     return markup
 
@@ -125,6 +130,16 @@ def tests_menu():
     markup.add(back_btn)
     return markup
 
+# Меню выбора способа оплаты
+def payment_options_menu():
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton("🇷🇺 Картой РФ / СБП (Prodamus)", callback_data="pay_prodamus"),
+        types.InlineKeyboardButton("🌍 Зарубежной картой (Boosty)", callback_data="pay_boosty"),
+        types.InlineKeyboardButton("◀️ Назад", callback_data="back_to_menu")
+    )
+    return markup
+
 # Приветствие для новых пользователей
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -134,24 +149,42 @@ def send_welcome(message):
     args = message.text.split()
     ref_source = "TikTok" if len(args) > 1 else "прямого перехода"
     
-    welcome_text = f"""🧭 *НАВИГАЦИЯ ПО ПРАКТИКАМ И ТЕСТАМ*
+    if check_subscription(user_id):
+        welcome_text = f"""🧭 *Навигатор практик и тестов*
+
+🌟 Привет, {first_name}!
+
+Рады видеть тебя с {ref_source}!
+
+Выбери, что тебя интересует:
+• 🧪 *Тест на созависимость* — узнай свой уровень
+• 🧘 *Практики* — упражнения для проработки
+• 📊 *Тесты* — самодиагностика
+• 💰 *Гайд с медитацией* — полный комплект за 990₽"""
+        
+        bot.send_message(
+            message.chat.id, 
+            welcome_text, 
+            parse_mode='Markdown',
+            reply_markup=main_menu()
+        )
+    else:
+        welcome_text = f"""🧭 *НАВИГАЦИЯ ПО ПРАКТИКАМ И ТЕСТАМ*
 
 🌟 Привет, {first_name}!
 
 Рады видеть тебя с {ref_source}! 👋
 
-Добро пожаловать! Здесь собраны все ключевые материалы для твоего роста. Подписывайся — впереди ещё больше техник по психологии, отношениям и нейропереворотам!
-
 *Чтобы получить доступ к материалам, нужно подписаться на канал:*
 
 👇 Нажми кнопку ниже, чтобы подписаться"""
-    
-    bot.send_message(
-        message.chat.id, 
-        welcome_text, 
-        parse_mode='Markdown',
-        reply_markup=subscription_button()
-    )
+        
+        bot.send_message(
+            message.chat.id, 
+            welcome_text, 
+            parse_mode='Markdown',
+            reply_markup=subscription_button()
+        )
 
 # Обработка нажатия на "Я подписался"
 @bot.callback_query_handler(func=lambda call: call.data == "check_sub")
@@ -206,7 +239,6 @@ def category_callback(call):
             reply_markup=markup
         )
     except:
-        # Если сообщение не изменилось - просто игнорируем
         pass
 
 # Обработка выбора практики/теста
@@ -308,6 +340,53 @@ def back_to_main(call):
     except:
         pass
 
+# Обработка кнопки "Купить гайд"
+@bot.callback_query_handler(func=lambda call: call.data == "show_payment_options")
+def show_payment_options(call):
+    bot.edit_message_text(
+        f"💰 *Выберите способ оплаты*\n\n"
+        f"Сумма: 990 ₽\n\n"
+        f"🇷🇺 *Для клиентов из России:* быстрая оплата картой РФ или СБП\n"
+        f"🌍 *Для клиентов из других стран:* оплата через Boosty",
+        call.message.chat.id,
+        call.message.message_id,
+        parse_mode='Markdown',
+        reply_markup=payment_options_menu()
+    )
+
+# Обработка выбора Prodamus
+@bot.callback_query_handler(func=lambda call: call.data == "pay_prodamus")
+def pay_prodamus(call):
+    PRODAMUS_LINK = "https://getman-help.payform.ru/?invoice_id=1dd05bbc8fd9459cfc74dba302e4b6ce&paylink=1"
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("💳 Перейти к оплате", url=PRODAMUS_LINK))
+    
+    bot.edit_message_text(
+        f"🔗 *Ссылка для оплаты через Prodamus готова!*\n\n"
+        f"Сумма: 990 ₽\n\n"
+        f"После оплаты напиши сюда, и я отправлю материалы вручную.",
+        call.message.chat.id,
+        call.message.message_id,
+        parse_mode='Markdown',
+        reply_markup=markup
+    )
+
+# Обработка выбора Boosty
+@bot.callback_query_handler(func=lambda call: call.data == "pay_boosty")
+def pay_boosty(call):
+    BOOSTY_LINK = "https://boosty.to/evgeniy_getman/posts/0b9dddb2-3b0b-45e8-9caa-e5f395c850cb?share=post_link"
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("💳 Перейти к оплате", url=BOOSTY_LINK))
+    
+    bot.edit_message_text(
+        f"🔗 *Ссылка для оплаты через Boosty готова!*\n\n"
+        f"После оплаты напиши сюда, и я отправлю материалы вручную.",
+        call.message.chat.id,
+        call.message.message_id,
+        parse_mode='Markdown',
+        reply_markup=markup
+    )
+
 # Команда /menu для быстрого доступа
 @bot.message_handler(commands=['menu'])
 def show_menu(message):
@@ -334,11 +413,9 @@ def show_menu(message):
             reply_markup=subscription_button()
         )
 
-# ===== НОВАЯ ФУНКЦИЯ ДЛЯ ПОЛУЧЕНИЯ FILE_ID =====
+# Функция для получения file_id
 @bot.message_handler(content_types=['document', 'audio', 'photo', 'video', 'voice'])
 def handle_files(message):
-    """Получение file_id от любого файла (только для админа)"""
-    # Проверяем, что это админ (твой ID)
     ADMIN_ID = int(os.getenv('ADMIN_ID', '7579002030'))
     
     if message.from_user.id != ADMIN_ID:
@@ -349,41 +426,16 @@ def handle_files(message):
     if message.document:
         file_id = message.document.file_id
         file_name = message.document.file_name
-        file_size = message.document.file_size
         response += f"📄 Документ: {file_name}\n"
-        response += f"📎 File ID: {file_id}\n"
-        response += f"📊 Размер: {file_size} байт\n\n"
-        response += "📋 Скопируй это:\n"
+        response += f"📎 File ID: {file_id}\n\n"
         response += file_id
-        
     elif message.audio:
         file_id = message.audio.file_id
         title = message.audio.title or "audio"
-        performer = message.audio.performer or "unknown"
-        response += f"🎵 Аудио: {title} - {performer}\n"
-        response += f"📎 File ID: {file_id}\n\n"
-        response += file_id
-        
-    elif message.photo:
-        photo = message.photo[-1]
-        file_id = photo.file_id
-        response += f"🖼️ Фото: {photo.width}x{photo.height}\n"
-        response += f"📎 File ID: {file_id}\n\n"
-        response += file_id
-        
-    elif message.video:
-        file_id = message.video.file_id
-        response += f"🎬 Видео: {message.video.file_name if hasattr(message.video, 'file_name') else 'video'}\n"
-        response += f"📎 File ID: {file_id}\n\n"
-        response += file_id
-        
-    elif message.voice:
-        file_id = message.voice.file_id
-        response += f"🎤 Голосовое: {message.voice.duration} сек\n"
+        response += f"🎵 Аудио: {title}\n"
         response += f"📎 File ID: {file_id}\n\n"
         response += file_id
     
-    # Отправляем БЕЗ parse_mode, чтобы избежать ошибок
     bot.reply_to(message, response)
 
 # ===== ЗАПУСК БОТА =====
