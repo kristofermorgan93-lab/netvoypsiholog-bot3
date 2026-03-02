@@ -26,7 +26,7 @@ PRACTICES = {
     },
     'transformation_map': {
         'name': '🧭 Карта Трансформации',
-        'link': 't.me/netvoipsiholog/30',
+        'link': 'https://t.me/netvoipsiholog/30',
         'category': 'practices'
     },
     'year_closure': {
@@ -194,14 +194,20 @@ def category_callback(call):
     elif category == 'tests':
         text = "📊 *Доступные тесты:*\n\nВыбери тест для самодиагностики:"
         markup = tests_menu()
+    else:
+        return
     
-    bot.edit_message_text(
-        text,
-        call.message.chat.id,
-        call.message.message_id,
-        parse_mode='Markdown',
-        reply_markup=markup
-    )
+    try:
+        bot.edit_message_text(
+            text,
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
+    except:
+        # Если сообщение не изменилось - просто игнорируем
+        pass
 
 # Обработка выбора практики/теста
 @bot.callback_query_handler(func=lambda call: call.data.startswith('item_'))
@@ -231,14 +237,17 @@ def item_callback(call):
         main_btn = types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main")
         markup.add(back_btn, main_btn)
         
-        bot.edit_message_text(
-            item_text,
-            call.message.chat.id,
-            call.message.message_id,
-            parse_mode='Markdown',
-            disable_web_page_preview=False,
-            reply_markup=markup
-        )
+        try:
+            bot.edit_message_text(
+                item_text,
+                call.message.chat.id,
+                call.message.message_id,
+                parse_mode='Markdown',
+                disable_web_page_preview=False,
+                reply_markup=markup
+            )
+        except:
+            pass
     else:
         bot.answer_callback_query(call.id, "Материал не найден")
 
@@ -266,13 +275,16 @@ def info_callback(call):
     markup.add(channel_btn)
     markup.add(back_btn)
     
-    bot.edit_message_text(
-        info_text,
-        call.message.chat.id,
-        call.message.message_id,
-        parse_mode='Markdown',
-        reply_markup=markup
-    )
+    try:
+        bot.edit_message_text(
+            info_text,
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
+    except:
+        pass
 
 # Возврат в главное меню
 @bot.callback_query_handler(func=lambda call: call.data == "back_to_main")
@@ -285,13 +297,16 @@ def back_to_main(call):
 
 *Обновляется регулярно.* Новые практики — в свежих постах на канале!"""
     
-    bot.edit_message_text(
-        text,
-        call.message.chat.id,
-        call.message.message_id,
-        parse_mode='Markdown',
-        reply_markup=main_menu()
-    )
+    try:
+        bot.edit_message_text(
+            text,
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode='Markdown',
+            reply_markup=main_menu()
+        )
+    except:
+        pass
 
 # Команда /menu для быстрого доступа
 @bot.message_handler(commands=['menu'])
@@ -329,47 +344,47 @@ def handle_files(message):
     if message.from_user.id != ADMIN_ID:
         return
     
-    response = "📁 *Информация о файле:*\n\n"
+    response = "📁 ИНФОРМАЦИЯ О ФАЙЛЕ:\n\n"
     
     if message.document:
         file_id = message.document.file_id
         file_name = message.document.file_name
         file_size = message.document.file_size
-        response += f"📄 *Документ:* {file_name}\n"
-        response += f"📎 *File ID:* `{file_id}`\n"
-        response += f"📊 *Размер:* {file_size} байт\n\n"
-        response += "📋 *Скопируй это:*\n"
-        response += f"`{file_id}`"
+        response += f"📄 Документ: {file_name}\n"
+        response += f"📎 File ID: {file_id}\n"
+        response += f"📊 Размер: {file_size} байт\n\n"
+        response += "📋 Скопируй это:\n"
+        response += file_id
         
     elif message.audio:
         file_id = message.audio.file_id
         title = message.audio.title or "audio"
         performer = message.audio.performer or "unknown"
-        response += f"🎵 *Аудио:* {title} - {performer}\n"
-        response += f"📎 *File ID:* `{file_id}`\n\n"
-        response += f"`{file_id}`"
+        response += f"🎵 Аудио: {title} - {performer}\n"
+        response += f"📎 File ID: {file_id}\n\n"
+        response += file_id
         
     elif message.photo:
-        # Для фото берем самое большое качество (последнее в массиве)
         photo = message.photo[-1]
         file_id = photo.file_id
-        response += f"🖼️ *Фото:* {photo.width}x{photo.height}\n"
-        response += f"📎 *File ID:* `{file_id}`\n\n"
-        response += f"`{file_id}`"
+        response += f"🖼️ Фото: {photo.width}x{photo.height}\n"
+        response += f"📎 File ID: {file_id}\n\n"
+        response += file_id
         
     elif message.video:
         file_id = message.video.file_id
-        response += f"🎬 *Видео:* {message.video.file_name if hasattr(message.video, 'file_name') else 'video'}\n"
-        response += f"📎 *File ID:* `{file_id}`\n\n"
-        response += f"`{file_id}`"
+        response += f"🎬 Видео: {message.video.file_name if hasattr(message.video, 'file_name') else 'video'}\n"
+        response += f"📎 File ID: {file_id}\n\n"
+        response += file_id
         
     elif message.voice:
         file_id = message.voice.file_id
-        response += f"🎤 *Голосовое:* {message.voice.duration} сек\n"
-        response += f"📎 *File ID:* `{file_id}`\n\n"
-        response += f"`{file_id}`"
+        response += f"🎤 Голосовое: {message.voice.duration} сек\n"
+        response += f"📎 File ID: {file_id}\n\n"
+        response += file_id
     
-    bot.reply_to(message, response, parse_mode='Markdown')
+    # Отправляем БЕЗ parse_mode, чтобы избежать ошибок
+    bot.reply_to(message, response)
 
 # ===== ЗАПУСК БОТА =====
 if __name__ == '__main__':
