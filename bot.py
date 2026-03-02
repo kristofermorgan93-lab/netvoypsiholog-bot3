@@ -322,4 +322,53 @@ def show_menu(message):
 # Запуск бота
 if __name__ == '__main__':
     print("🚀 Бот с практиками и тестами запущен...")
-    bot.infinity_polling()
+    @bot.message_handler(content_types=['document', 'audio', 'photo', 'video', 'voice'])
+def handle_files(message):
+    """Получение file_id от любого файла (только для админа)"""
+    # Проверяем, что это админ (твой ID)
+    ADMIN_ID = int(os.getenv('ADMIN_ID', '7579002030'))
+    
+    if message.from_user.id != ADMIN_ID:
+        return
+    
+    response = "📁 *Информация о файле:*\n\n"
+    
+    if message.document:
+        file_id = message.document.file_id
+        file_name = message.document.file_name
+        file_size = message.document.file_size
+        response += f"📄 *Документ:* {file_name}\n"
+        response += f"📎 *File ID:* `{file_id}`\n"
+        response += f"📊 *Размер:* {file_size} байт\n\n"
+        response += "📋 *Скопируй это:*\n"
+        response += f"`{file_id}`"
+        
+    elif message.audio:
+        file_id = message.audio.file_id
+        title = message.audio.title or "audio"
+        performer = message.audio.performer or "unknown"
+        response += f"🎵 *Аудио:* {title} - {performer}\n"
+        response += f"📎 *File ID:* `{file_id}`\n\n"
+        response += f"`{file_id}`"
+        
+    elif message.photo:
+        # Для фото берем самое большое качество (последнее в массиве)
+        photo = message.photo[-1]
+        file_id = photo.file_id
+        response += f"🖼️ *Фото:* {photo.width}x{photo.height}\n"
+        response += f"📎 *File ID:* `{file_id}`\n\n"
+        response += f"`{file_id}`"
+        
+    elif message.video:
+        file_id = message.video.file_id
+        response += f"🎬 *Видео:* {message.video.file_name if hasattr(message.video, 'file_name') else 'video'}\n"
+        response += f"📎 *File ID:* `{file_id}`\n\n"
+        response += f"`{file_id}`"
+        
+    elif message.voice:
+        file_id = message.voice.file_id
+        response += f"🎤 *Голосовое:* {message.voice.duration} сек\n"
+        response += f"📎 *File ID:* `{file_id}`\n\n"
+        response += f"`{file_id}`"
+    
+    bot.reply_to(message, response, parse_mode='Markdown')bot.infinity_polling()
