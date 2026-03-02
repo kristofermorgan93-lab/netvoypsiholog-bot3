@@ -16,6 +16,59 @@ else:
 # ID ТВОЕГО КАНАЛА
 CHANNEL_ID = '@netvoipsiholog'
 
+# ВОПРОСЫ ДЛЯ ТЕСТА
+QUESTIONS = [
+    "Я часто беру ответственность за чувства других людей",
+    "Мне трудно сказать 'нет', даже когда не хочется что-то делать",
+    "Я постоянно думаю о проблемах близких людей",
+    "Мне кажется, что без меня другие не справятся",
+    "Я чувствую вину, когда занимаюсь собой",
+    "Мне важно, что обо мне думают другие",
+    "Я терплю неуважение в отношениях",
+    "Мне трудно просить о помощи",
+    "Я часто оправдываю плохое поведение других",
+    "Моё настроение зависит от настроения партнёра",
+    "Я пытаюсь 'спасать' и 'исправлять' близких",
+    "Мне страшно, что меня бросят",
+    "Я готова на всё, чтобы сохранить отношения",
+    "Я не знаю, чего хочу на самом деле",
+    "Мне трудно принимать комплименты"
+]
+
+# РЕЗУЛЬТАТЫ ТЕСТА
+RESULTS = {
+    "low": {
+        "range": (0, 10),
+        "text": """
+📊 *Результат: Низкий уровень созависимости*
+
+У вас здоровые отношения с собой и другими. Вы умеете выстраивать личные границы и заботиться о себе.
+
+*Но помните:* даже при хорошем результате профилактика не помешает. Полный гайд поможет укрепить ваши здоровые паттерны и избежать проблем в будущем.
+"""
+    },
+    "medium": {
+        "range": (11, 20),
+        "text": """
+📊 *Результат: Средний уровень созависимости*
+
+У вас есть склонность к созависимости. Эти паттерны уже влияют на вашу жизнь и отношения, хотя вы можете этого не замечать.
+
+*Что делать:* Вам точно нужна проработка. Полный гайд '5 шагов выхода из созависимости' поможет вам увидеть свои слепые зоны и начать меняться.
+"""
+    },
+    "high": {
+        "range": (21, 30),
+        "text": """
+📊 *Результат: Высокий уровень созависимости*
+
+У вас выраженная созависимость, которая мешает вам жить счастливо. Вы слишком много берёте на себя, терпите неуважение и теряете себя в отношениях.
+
+*Срочно нужно:* Вам жизненно необходима работа над собой. Полный гайд '5 шагов выхода из созависимости' + аудиомедитация — это ваш первый шаг к свободе.
+"""
+    }
+}
+
 # ПРАКТИКИ И ТЕСТЫ (разбиты по категориям)
 PRACTICES = {
     # ПРАКТИКИ
@@ -70,6 +123,9 @@ PRACTICES = {
 
 bot = telebot.TeleBot(TOKEN)
 
+# Хранилище для состояний теста
+user_sessions = {}
+
 # Функция проверки подписки
 def check_subscription(user_id):
     try:
@@ -91,7 +147,7 @@ def subscription_button():
     markup.add(check_btn)
     return markup
 
-# ===== ИСПРАВЛЕННОЕ ГЛАВНОЕ МЕНЮ =====
+# Главное меню
 def main_menu():
     markup = types.InlineKeyboardMarkup(row_width=1)
     test_btn = types.InlineKeyboardButton("🧪 Пройти тест на созависимость", callback_data="start_test")
@@ -186,107 +242,177 @@ def send_welcome(message):
             reply_markup=subscription_button()
         )
 
-# Обработка нажатия на "Я подписался"
-@bot.callback_query_handler(func=lambda call: call.data == "check_sub")
-def check_sub_callback(call):
+# ===== ОБРАБОТКА ВСЕХ КНОПОК =====
+@bot.callback_query_handler(func=lambda call: True)
+def callback_handler(call):
     user_id = call.from_user.id
     
-    if check_subscription(user_id):
-        welcome_text = """✅ *Отлично! Подписка подтверждена*
-
-🧭 *Добро пожаловать в навигатор практик и тестов!*
-
-Выбери, что тебя интересует:
-• 🧘 *Практики* — упражнения для проработки
-• 📊 *Тесты* — самодиагностика и инсайты
-
-*Обновляется регулярно.* Новые практики — в свежих постах на канале!"""
-        
+    # ===== ПРОВЕРКА ПОДПИСКИ =====
+    if call.data == "check_sub":
+        if check_subscription(user_id):
+            bot.edit_message_text(
+                "✅ Подписка подтверждена!\n\nВыбери действие:",
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=main_menu()
+            )
+        else:
+            bot.answer_callback_query(call.id, "❌ Подписка не найдена", show_alert=True)
+    
+    # ===== ВОЗВРАТ В МЕНЮ =====
+    elif call.data == "back_to_main" or call.data == "back_to_menu":
         bot.edit_message_text(
-            welcome_text,
+            "Выбери действие:",
             call.message.chat.id,
             call.message.message_id,
-            parse_mode='Markdown',
             reply_markup=main_menu()
         )
-    else:
-        bot.answer_callback_query(
-            call.id,
-            "❌ Подписка не найдена. Пожалуйста, подпишись на канал и нажми кнопку еще раз!",
-            show_alert=True
+    
+    # ===== НАЧАЛО ТЕСТА =====
+    elif call.data == "start_test":
+        user_sessions[user_id] = {
+            'question': 0,
+            'answers': []
+        }
+        
+        markup = types.InlineKeyboardMarkup()
+        markup.add(
+            types.InlineKeyboardButton("✅ Да", callback_data="answer_2"),
+            types.InlineKeyboardButton("🤔 Иногда", callback_data="answer_1"),
+            types.InlineKeyboardButton("❌ Нет", callback_data="answer_0")
         )
-
-# Обработка выбора категории
-@bot.callback_query_handler(func=lambda call: call.data.startswith('category_'))
-def category_callback(call):
-    category = call.data.replace('category_', '')
-    
-    if category == 'practices':
-        text = "🧘 *Доступные практики:*\n\nВыбери практику для выполнения:"
-        markup = practices_menu()
-    elif category == 'tests':
-        text = "📊 *Доступные тесты:*\n\nВыбери тест для самодиагностики:"
-        markup = tests_menu()
-    else:
-        return
-    
-    try:
+        
         bot.edit_message_text(
-            text,
+            f"*Вопрос 1 из 15:*\n\n{QUESTIONS[0]}",
             call.message.chat.id,
             call.message.message_id,
             parse_mode='Markdown',
             reply_markup=markup
         )
-    except:
-        pass
-
-# Обработка выбора практики/теста
-@bot.callback_query_handler(func=lambda call: call.data.startswith('item_'))
-def item_callback(call):
-    item_id = call.data.replace('item_', '')
-    item = PRACTICES.get(item_id)
     
-    if item:
-        category_icon = "🧘" if item['category'] == 'practices' else "📊"
-        category_text = "практике" if item['category'] == 'practices' else "тесте"
+    # ===== ОТВЕТЫ НА ВОПРОСЫ =====
+    elif call.data.startswith("answer_"):
+        score = int(call.data.split('_')[1])
+        session = user_sessions.get(user_id)
         
-        item_text = f"""{category_icon} *{item['name']}*
+        if session:
+            session['answers'].append(score)
+            session['question'] += 1
+            
+            if session['question'] < 15:
+                markup = types.InlineKeyboardMarkup()
+                markup.add(
+                    types.InlineKeyboardButton("✅ Да", callback_data="answer_2"),
+                    types.InlineKeyboardButton("🤔 Иногда", callback_data="answer_1"),
+                    types.InlineKeyboardButton("❌ Нет", callback_data="answer_0")
+                )
+                
+                bot.edit_message_text(
+                    f"*Вопрос {session['question'] + 1} из 15:*\n\n{QUESTIONS[session['question']]}",
+                    call.message.chat.id,
+                    call.message.message_id,
+                    parse_mode='Markdown',
+                    reply_markup=markup
+                )
+            else:
+                # Тест окончен, считаем результат
+                total = sum(session['answers'])
+                
+                if total <= 10:
+                    result_text = RESULTS['low']['text']
+                elif total <= 20:
+                    result_text = RESULTS['medium']['text']
+                else:
+                    result_text = RESULTS['high']['text']
+                
+                bot.edit_message_text(
+                    result_text,
+                    call.message.chat.id,
+                    call.message.message_id,
+                    parse_mode='Markdown'
+                )
+                
+                # Предлагаем купить гайд
+                markup = types.InlineKeyboardMarkup()
+                buy_btn = types.InlineKeyboardButton("💰 Купить гайд за 990₽", callback_data="show_payment_options")
+                menu_btn = types.InlineKeyboardButton("◀️ В меню", callback_data="back_to_main")
+                markup.add(buy_btn)
+                markup.add(menu_btn)
+                
+                bot.send_message(
+                    call.message.chat.id,
+                    "📚 *Хочешь получить полный гайд с медитацией?*\n\n"
+                    "В нём: 5 шагов выхода из созависимости, скрипты разговоров, дневник прогресса и аудиомедитация.",
+                    parse_mode='Markdown',
+                    reply_markup=markup
+                )
+                
+                # Очищаем сессию
+                del user_sessions[user_id]
+    
+    # ===== КАТЕГОРИИ =====
+    elif call.data == "category_practices":
+        bot.edit_message_text(
+            "🧘 *Доступные практики:*\n\nВыбери практику для выполнения:",
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode='Markdown',
+            reply_markup=practices_menu()
+        )
+    
+    elif call.data == "category_tests":
+        bot.edit_message_text(
+            "📊 *Доступные тесты:*\n\nВыбери тест для самодиагностики:",
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode='Markdown',
+            reply_markup=tests_menu()
+        )
+    
+    # ===== ПРАКТИКИ/ТЕСТЫ =====
+    elif call.data.startswith('item_'):
+        item_id = call.data.replace('item_', '')
+        item = PRACTICES.get(item_id)
+        
+        if item:
+            category_icon = "🧘" if item['category'] == 'practices' else "📊"
+            category_text = "практике" if item['category'] == 'practices' else "тесте"
+            
+            item_text = f"""{category_icon} *{item['name']}*
 
 Твой материал готов! Переходи по ссылке, чтобы начать работу.
 
 *Важно:* Если материал не открывается, проверь подписку на канал.
 
 [🔗 Перейти к {category_text}]({item['link']})"""
-        
-        markup = types.InlineKeyboardMarkup(row_width=2)
-        
-        if item['category'] == 'practices':
-            back_btn = types.InlineKeyboardButton("◀️ К практикам", callback_data="category_practices")
+            
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            
+            if item['category'] == 'practices':
+                back_btn = types.InlineKeyboardButton("◀️ К практикам", callback_data="category_practices")
+            else:
+                back_btn = types.InlineKeyboardButton("◀️ К тестам", callback_data="category_tests")
+            
+            main_btn = types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main")
+            markup.add(back_btn, main_btn)
+            
+            try:
+                bot.edit_message_text(
+                    item_text,
+                    call.message.chat.id,
+                    call.message.message_id,
+                    parse_mode='Markdown',
+                    disable_web_page_preview=False,
+                    reply_markup=markup
+                )
+            except:
+                pass
         else:
-            back_btn = types.InlineKeyboardButton("◀️ К тестам", callback_data="category_tests")
-        
-        main_btn = types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main")
-        markup.add(back_btn, main_btn)
-        
-        try:
-            bot.edit_message_text(
-                item_text,
-                call.message.chat.id,
-                call.message.message_id,
-                parse_mode='Markdown',
-                disable_web_page_preview=False,
-                reply_markup=markup
-            )
-        except:
-            pass
-    else:
-        bot.answer_callback_query(call.id, "Материал не найден")
-
-# Информация о канале
-@bot.callback_query_handler(func=lambda call: call.data == "info")
-def info_callback(call):
-    info_text = """ℹ️ *О канале*
+            bot.answer_callback_query(call.id, "Материал не найден")
+    
+    # ===== ИНФО =====
+    elif call.data == "info":
+        info_text = """ℹ️ *О канале*
 
 Это пространство для твоего роста и трансформации. Здесь ты найдешь:
 • Психологические практики
@@ -297,17 +423,16 @@ def info_callback(call):
 📢 *Основной канал:* @netvoipsiholog
 
 *Обновляется регулярно.* Подписывайся, чтобы не пропустить новые практики!"""
-    
-    markup = types.InlineKeyboardMarkup()
-    channel_btn = types.InlineKeyboardButton(
-        "📢 Перейти на канал", 
-        url=f"https://t.me/{CHANNEL_ID.replace('@', '')}"
-    )
-    back_btn = types.InlineKeyboardButton("◀️ В главное меню", callback_data="back_to_main")
-    markup.add(channel_btn)
-    markup.add(back_btn)
-    
-    try:
+        
+        markup = types.InlineKeyboardMarkup()
+        channel_btn = types.InlineKeyboardButton(
+            "📢 Перейти на канал", 
+            url=f"https://t.me/{CHANNEL_ID.replace('@', '')}"
+        )
+        back_btn = types.InlineKeyboardButton("◀️ В главное меню", callback_data="back_to_main")
+        markup.add(channel_btn)
+        markup.add(back_btn)
+        
         bot.edit_message_text(
             info_text,
             call.message.chat.id,
@@ -315,77 +440,48 @@ def info_callback(call):
             parse_mode='Markdown',
             reply_markup=markup
         )
-    except:
-        pass
-
-# Возврат в главное меню
-@bot.callback_query_handler(func=lambda call: call.data == "back_to_main")
-def back_to_main(call):
-    text = """🧭 *Навигатор практик и тестов*
-
-Выбери, что тебя интересует:
-• 🧘 *Практики* — упражнения для проработки
-• 📊 *Тесты* — самодиагностика и инсайты
-
-*Обновляется регулярно.* Новые практики — в свежих постах на канале!"""
     
-    try:
+    # ===== ОПЛАТА =====
+    elif call.data == "show_payment_options":
         bot.edit_message_text(
-            text,
+            f"💰 *Выберите способ оплаты*\n\n"
+            f"Сумма: 990 ₽\n\n"
+            f"🇷🇺 *Для клиентов из России:* быстрая оплата картой РФ или СБП\n"
+            f"🌍 *Для клиентов из других стран:* оплата через Boosty",
             call.message.chat.id,
             call.message.message_id,
             parse_mode='Markdown',
-            reply_markup=main_menu()
+            reply_markup=payment_options_menu()
         )
-    except:
-        pass
-
-# Обработка кнопки "Купить гайд"
-@bot.callback_query_handler(func=lambda call: call.data == "show_payment_options")
-def show_payment_options(call):
-    bot.edit_message_text(
-        f"💰 *Выберите способ оплаты*\n\n"
-        f"Сумма: 990 ₽\n\n"
-        f"🇷🇺 *Для клиентов из России:* быстрая оплата картой РФ или СБП\n"
-        f"🌍 *Для клиентов из других стран:* оплата через Boosty",
-        call.message.chat.id,
-        call.message.message_id,
-        parse_mode='Markdown',
-        reply_markup=payment_options_menu()
-    )
-
-# Обработка выбора Prodamus
-@bot.callback_query_handler(func=lambda call: call.data == "pay_prodamus")
-def pay_prodamus(call):
-    PRODAMUS_LINK = "https://getman-help.payform.ru/?invoice_id=1dd05bbc8fd9459cfc74dba302e4b6ce&paylink=1"
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("💳 Перейти к оплате", url=PRODAMUS_LINK))
     
-    bot.edit_message_text(
-        f"🔗 *Ссылка для оплаты через Prodamus готова!*\n\n"
-        f"Сумма: 990 ₽\n\n"
-        f"После оплаты напиши сюда, и я отправлю материалы вручную.",
-        call.message.chat.id,
-        call.message.message_id,
-        parse_mode='Markdown',
-        reply_markup=markup
-    )
-
-# Обработка выбора Boosty
-@bot.callback_query_handler(func=lambda call: call.data == "pay_boosty")
-def pay_boosty(call):
-    BOOSTY_LINK = "https://boosty.to/evgeniy_getman/posts/0b9dddb2-3b0b-45e8-9caa-e5f395c850cb?share=post_link"
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("💳 Перейти к оплате", url=BOOSTY_LINK))
+    elif call.data == "pay_prodamus":
+        PRODAMUS_LINK = "https://getman-help.payform.ru/?invoice_id=1dd05bbc8fd9459cfc74dba302e4b6ce&paylink=1"
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("💳 Перейти к оплате", url=PRODAMUS_LINK))
+        
+        bot.edit_message_text(
+            f"🔗 *Ссылка для оплаты через Prodamus готова!*\n\n"
+            f"Сумма: 990 ₽\n\n"
+            f"После оплаты напиши сюда, и я отправлю материалы вручную.",
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
     
-    bot.edit_message_text(
-        f"🔗 *Ссылка для оплаты через Boosty готова!*\n\n"
-        f"После оплаты напиши сюда, и я отправлю материалы вручную.",
-        call.message.chat.id,
-        call.message.message_id,
-        parse_mode='Markdown',
-        reply_markup=markup
-    )
+    elif call.data == "pay_boosty":
+        BOOSTY_LINK = "https://boosty.to/evgeniy_getman/posts/0b9dddb2-3b0b-45e8-9caa-e5f395c850cb?share=post_link"
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton("💳 Перейти к оплате", url=BOOSTY_LINK))
+        
+        bot.edit_message_text(
+            f"🔗 *Ссылка для оплаты через Boosty готова!*\n\n"
+            f"После оплаты напиши сюда, и я отправлю материалы вручную.",
+            call.message.chat.id,
+            call.message.message_id,
+            parse_mode='Markdown',
+            reply_markup=markup
+        )
 
 # Команда /menu для быстрого доступа
 @bot.message_handler(commands=['menu'])
