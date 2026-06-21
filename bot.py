@@ -120,7 +120,9 @@ PRACTICES = {
         'category': 'tests'
     },
     
-    # ВСЕ ГАЙДЫ (4 штуки)
+    # ===== ВСЕ ГАЙДЫ (5 штук) =====
+    
+    # 1. ГАЙД ПО СОЗАВИСИМОСТИ (основной)
     'codependency_guide': {
         'name': '📘 Выход из созависимости',
         'category': 'guides',
@@ -128,6 +130,8 @@ PRACTICES = {
         'prodamus': 'https://getman-help.payform.ru/?invoice_id=1dd05bbc8fd9459cfc74dba302e4b6ce&paylink=1',
         'boosty': 'https://boosty.to/evgeniy_getman'
     },
+    
+    # 2. АНТИПРОКРАСТИНАЦИЯ
     'antiprocrastination': {
         'name': '⏳ Антипрокрастинация',
         'category': 'guides',
@@ -135,6 +139,8 @@ PRACTICES = {
         'prodamus': 'https://getman-help.payform.ru/?invoice_id=e58590883ed1495cfb57efe0fccbc372&paylink=1',
         'boosty': 'https://boosty.to/evgeniy_getman/posts/886b6d7f-b500-478a-ae9f-96f0c7f375bd?share=post_link'
     },
+    
+    # 3. АНТИТРЕВОГА
     'antianxiety': {
         'name': '🌿 Антитревога',
         'category': 'guides',
@@ -142,12 +148,23 @@ PRACTICES = {
         'prodamus': 'https://getman-help.payform.ru/?invoice_id=c920cf5c66584bbee8c0ec272ca0c8e0&paylink=1',
         'boosty': 'https://boosty.to/evgeniy_getman/posts/eca8a389-c989-4a1b-b5c5-b047f860a998?share=post_link'
     },
+    
+    # 4. САМООЦЕНКА
     'selfesteem': {
         'name': '💪 Самооценка',
         'category': 'guides',
         'description': '💪 *Гайд «Самооценка»*\n\nПерестань сомневаться в себе.\n\n✅ PDF-гайд\n✅ Чек-лист «Опора на себя»\n\n💰 *Цена: 990₽*',
         'prodamus': 'https://getman-help.payform.ru/?invoice_id=3d9b03898a587f28fb95a8f4b4ab16cd&paylink=1',
         'boosty': 'https://boosty.to/evgeniy_getman/posts/f9c900b1-5e28-4a42-888d-cc12b9af50dd?share=post_link'
+    },
+    
+    # 5. НОВЫЙ ГАЙД — НАРЦИСС
+    'narcissist': {
+        'name': '🔍 Нарцисс: как распознать',
+        'category': 'guides',
+        'description': '🔍 *Гайд «Нарцисс: как распознать и не влюбиться»*\n\nКак не попасть в ловушку обаяния и не потерять себя.\n\n✅ PDF-гайд с признаками нарцисса\n✅ Чек-лист «Красные флаги»\n✅ Техники выхода из отношений с нарциссом\n\n💰 *Цена: 990₽*',
+        'prodamus': 'https://payform.ru/75bOVwM/',
+        'boosty': 'https://boosty.to/evgeniy_getman/posts/9a7d13bc-e4db-4bdf-8db3-7e4be8caf6e3?share=post_link'
     }
 }
 
@@ -203,7 +220,7 @@ def tests_menu():
     markup.add(types.InlineKeyboardButton("◀️ В главное меню", callback_data="back_to_main"))
     return markup
 
-# Меню со ВСЕМИ гайдами (4 штуки)
+# Меню со ВСЕМИ гайдами (5 штук)
 def guides_menu():
     markup = types.InlineKeyboardMarkup(row_width=1)
     for guide_id, guide in PRACTICES.items():
@@ -230,7 +247,7 @@ def send_welcome(message):
 
 Что тебя интересует?
 • 🧪 *Тест на созависимость* (бесплатно)
-• 📚 *Все гайды* (4 пособия)
+• 📚 *Все гайды* (5 пособий)
 • 🧘 Практики и 📊 тесты"""
         
         bot.send_message(message.chat.id, welcome_text, parse_mode='Markdown', reply_markup=main_menu())
@@ -350,7 +367,7 @@ def callback_handler(call):
             
             bot.edit_message_text(item_text, call.message.chat.id, call.message.message_id, parse_mode='Markdown', disable_web_page_preview=False, reply_markup=markup)
     
-    # ВСЕ ГАЙДЫ (4 штуки)
+    # ВСЕ ГАЙДЫ (5 штук)
     elif call.data.startswith('guide_'):
         guide_id = call.data.replace('guide_', '')
         guide = PRACTICES.get(guide_id)
@@ -408,5 +425,5 @@ def handle_files(message):
 
 # ===== ЗАПУСК =====
 if __name__ == '__main__':
-    print("🚀 Бот со всеми 4 гайдами запущен...")
+    print("🚀 Бот со всеми 5 гайдами запущен...")
     bot.infinity_polling()
