@@ -69,7 +69,7 @@ RESULTS = {
     }
 }
 
-# ===== ВСЕ ГАЙДЫ (6 штук) =====
+# ===== ВСЕ ПРОДУКТЫ =====
 PRACTICES = {
     # ПРАКТИКИ
     'letter_to_mother': {
@@ -120,9 +120,7 @@ PRACTICES = {
         'category': 'tests'
     },
     
-    # ===== ГАЙДЫ =====
-    
-    # 1. ВЫХОД ИЗ СОЗАВИСИМОСТИ
+    # ===== ГАЙДЫ (6 штук) =====
     'codependency_guide': {
         'name': '📘 Выход из созависимости',
         'category': 'guides',
@@ -131,8 +129,6 @@ PRACTICES = {
         'boosty': 'https://boosty.to/evgeniy_getman/posts/0b9dddb2-3b0b-45e8-9caa-e5f395c850cb?share=post_link',
         'group_link': 'https://t.me/+aZxoSirTo6Y2ZDJi'
     },
-    
-    # 2. АНТИПРОКРАСТИНАЦИЯ
     'antiprocrastination': {
         'name': '⏳ Антипрокрастинация',
         'category': 'guides',
@@ -141,8 +137,6 @@ PRACTICES = {
         'boosty': 'https://boosty.to/evgeniy_getman/posts/886b6d7f-b500-478a-ae9f-96f0c7f375bd?share=post_link',
         'group_link': 'https://t.me/+ZHEiYXGSRJE5MDJi'
     },
-    
-    # 3. АНТИТРЕВОГА
     'antianxiety': {
         'name': '🌿 Антитревога',
         'category': 'guides',
@@ -151,8 +145,6 @@ PRACTICES = {
         'boosty': 'https://boosty.to/evgeniy_getman/posts/eca8a389-c989-4a1b-b5c5-b047f860a998?share=post_link',
         'group_link': 'https://t.me/+jKd96l7sxHRiOGYy'
     },
-    
-    # 4. САМООЦЕНКА
     'selfesteem': {
         'name': '💪 Самооценка',
         'category': 'guides',
@@ -161,8 +153,6 @@ PRACTICES = {
         'boosty': 'https://boosty.to/evgeniy_getman/posts/f9c900b1-5e28-4a42-888d-cc12b9af50dd?share=post_link',
         'group_link': 'https://t.me/+tHhnbOtl3jRjNGUy'
     },
-    
-    # 5. НАРЦИСС
     'narcissist': {
         'name': '🔍 Нарцисс: как распознать',
         'category': 'guides',
@@ -171,8 +161,6 @@ PRACTICES = {
         'boosty': 'https://boosty.to/evgeniy_getman/posts/9a7d13bc-e4db-4bdf-8db3-7e4be8caf6e3?share=post_link',
         'group_link': 'https://t.me/+dvM830sJgR40YTFi'
     },
-    
-    # 6. НОВЫЙ ГАЙД — ГРАНИЦЫ
     'boundaries': {
         'name': '🛡️ Границы',
         'category': 'guides',
@@ -180,6 +168,34 @@ PRACTICES = {
         'prodamus': 'https://payform.ru/8dbZAzj/',
         'boosty': 'https://boosty.to/evgeniy_getman/posts/0c85e8df-7271-4f5f-a186-fa9e9618dc63?share=post_link',
         'group_link': 'https://t.me/+OjKcFbdPqaoyMGUy'
+    },
+    
+    # ===== НОВЫЙ ПРОДУКТ — ТЕТРАДЬ «ДЕНЬГИ=Я» =====
+    'money_notebook': {
+        'name': '💰 Деньги = Я',
+        'category': 'notebook',
+        'description': """💰 *Тетрадь-практикум «Деньги = Я»*
+
+Твой личный финансовый дневник. 30 дней практик, чтобы перестать бояться денег, наладить отношения с финансами и начать зарабатывать больше.
+
+*Что внутри тетради:*
+📓 30 ежедневных практик
+💎 Работа с убеждениями о деньгах
+📊 Отслеживание финансовых привычек
+
+*🎁 3 БОНУСА В ПОДАРОК:*
+✅ Чек-лист «Моя цена» — определи свою реальную стоимость
+✅ Скрипты для переговоров — шаблоны разговоров о деньгах
+✅ Таблица доходов и расходов — готовый шаблон для ведения бюджета
+
+*🔥 Цена: 2490₽*
+*🎯 По промокоду «ВПЕРЕД» — 1990₽*
+
+После оплаты материалы выдаются в Telegram-группе""",
+        'price': '2490₽ (по промокоду «ВПЕРЕД» — 1990₽)',
+        'prodamus': 'https://payform.ru/ijc6dWJ/',
+        'boosty': 'https://boosty.to/evgeniy_getman/posts/f78172f4-c4ae-4c42-8d10-a35960a88351?share=post_link',
+        'group_link': 'https://t.me/+mzldZA7y5X8wYTli'
     }
 }
 
@@ -210,7 +226,8 @@ def main_menu():
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
         types.InlineKeyboardButton("🧪 Пройти тест на созависимость", callback_data="start_test"),
-        types.InlineKeyboardButton("📚 Все гайды (6)", callback_data="category_guides"),
+        types.InlineKeyboardButton("📚 Все гайды", callback_data="category_guides"),
+        types.InlineKeyboardButton("💰 Тетрадь Деньги=Я", callback_data="notebook_money"),
         types.InlineKeyboardButton("🧘 Практики", callback_data="category_practices"),
         types.InlineKeyboardButton("📊 Тесты", callback_data="category_tests"),
         types.InlineKeyboardButton("ℹ️ О канале", callback_data="info")
@@ -254,7 +271,7 @@ def send_welcome(message):
     ref_source = "TikTok" if len(args) > 1 else "прямого перехода"
     
     if check_subscription(user_id):
-        welcome_text = f"""🧭 *Навигатор практик и тестов*
+        welcome_text = f"""🧭 *Навигатор*
 
 🌟 Привет, {first_name}!
 
@@ -262,12 +279,13 @@ def send_welcome(message):
 
 Что тебя интересует?
 • 🧪 *Тест на созависимость* (бесплатно)
-• 📚 *Все гайды* (6 пособий)
+• 📚 *Гайды* — 990₽
+• 💰 *Тетрадь Деньги=Я* — премиум-продукт
 • 🧘 Практики и 📊 тесты"""
         
         bot.send_message(message.chat.id, welcome_text, parse_mode='Markdown', reply_markup=main_menu())
     else:
-        welcome_text = f"""🧭 *НАВИГАЦИЯ ПО ПРАКТИКАМ И ТЕСТАМ*
+        welcome_text = f"""🧭 *НАВИГАЦИЯ*
 
 🌟 Привет, {first_name}!
 
@@ -336,7 +354,6 @@ def callback_handler(call):
                 
                 bot.edit_message_text(result_text, call.message.chat.id, call.message.message_id, parse_mode='Markdown')
                 
-                # ПОСЛЕ ТЕСТА ПРЕДЛАГАЕМ ГАЙД ПО СОЗАВИСИМОСТИ
                 markup = types.InlineKeyboardMarkup()
                 markup.add(
                     types.InlineKeyboardButton("📘 Купить гайд по созависимости", callback_data="guide_codependency_guide"),
@@ -382,7 +399,7 @@ def callback_handler(call):
             
             bot.edit_message_text(item_text, call.message.chat.id, call.message.message_id, parse_mode='Markdown', disable_web_page_preview=False, reply_markup=markup)
     
-    # ВСЕ ГАЙДЫ (6 штук)
+    # ГАЙДЫ
     elif call.data.startswith('guide_'):
         guide_id = call.data.replace('guide_', '')
         guide = PRACTICES.get(guide_id)
@@ -397,6 +414,24 @@ def callback_handler(call):
                 types.InlineKeyboardButton("🇷🇺 Картой РФ (Prodamus)", url=guide['prodamus']),
                 types.InlineKeyboardButton("🌍 Зарубежной картой (Boosty)", url=guide['boosty']),
                 types.InlineKeyboardButton("◀️ Ко всем гайдам", callback_data="category_guides")
+            )
+            
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=markup)
+    
+    # НОВЫЙ ПРОДУКТ — ТЕТРАДЬ
+    elif call.data == "notebook_money":
+        product = PRACTICES.get('money_notebook')
+        
+        if product:
+            text = f"""{product['description']}
+
+👇 Выбери способ оплаты:"""
+            
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            markup.add(
+                types.InlineKeyboardButton("🇷🇺 Картой РФ (Prodamus)", url=product['prodamus']),
+                types.InlineKeyboardButton("🌍 Зарубежной картой (Boosty)", url=product['boosty']),
+                types.InlineKeyboardButton("◀️ В главное меню", callback_data="back_to_main")
             )
             
             bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=markup)
@@ -440,5 +475,5 @@ def handle_files(message):
 
 # ===== ЗАПУСК =====
 if __name__ == '__main__':
-    print("🚀 Бот со всеми 6 гайдами запущен...")
+    print("🚀 Бот со всеми продуктами запущен...")
     bot.infinity_polling()
