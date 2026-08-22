@@ -120,7 +120,7 @@ PRACTICES = {
         'category': 'tests'
     },
     
-    # ===== ГАЙДЫ (6 штук) =====
+    # ===== ГАЙДЫ (7 штук) =====
     'codependency_guide': {
         'name': '📘 Выход из созависимости',
         'category': 'guides',
@@ -170,7 +170,17 @@ PRACTICES = {
         'group_link': 'https://t.me/+OjKcFbdPqaoyMGUy'
     },
     
-    # ===== НОВЫЙ ПРОДУКТ — ТЕТРАДЬ «ДЕНЬГИ=Я» =====
+    # НОВЫЙ ГАЙД — ОТПУСКАНИЕ
+    'letting_go': {
+        'name': '🕊️ Отпускание',
+        'category': 'guides',
+        'description': '🕊️ *Гайд «Отпускание»*\n\nКак отпустить прошлое, людей и ситуации, которые тянут вниз.\n\n✅ PDF-гайд с практиками\n✅ Чек-лист «Что я отпускаю»\n✅ Медитация «Освобождение»\n\n💰 *Цена: 990₽*\n\nПосле оплаты материалы выдаются в Telegram-группе',
+        'prodamus': 'https://payform.ru/pkckUfX/',
+        'boosty': 'https://boosty.to/evgeniy_getman/posts/46e2c89a-bafb-40ae-aa51-07a99e250282?share=post_link',
+        'group_link': 'https://t.me/+IZdXn_tC2LpmZTUy'
+    },
+    
+    # ===== ТЕТРАДЬ «ДЕНЬГИ=Я» =====
     'money_notebook': {
         'name': '💰 Деньги = Я',
         'category': 'notebook',
@@ -226,7 +236,7 @@ def main_menu():
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
         types.InlineKeyboardButton("🧪 Пройти тест на созависимость", callback_data="start_test"),
-        types.InlineKeyboardButton("📚 Все гайды", callback_data="category_guides"),
+        types.InlineKeyboardButton("📚 Все гайды (7)", callback_data="category_guides"),
         types.InlineKeyboardButton("💰 Тетрадь Деньги=Я", callback_data="notebook_money"),
         types.InlineKeyboardButton("🧘 Практики", callback_data="category_practices"),
         types.InlineKeyboardButton("📊 Тесты", callback_data="category_tests"),
@@ -252,7 +262,7 @@ def tests_menu():
     markup.add(types.InlineKeyboardButton("◀️ В главное меню", callback_data="back_to_main"))
     return markup
 
-# Меню со ВСЕМИ гайдами (6 штук)
+# Меню со ВСЕМИ гайдами (7 штук)
 def guides_menu():
     markup = types.InlineKeyboardMarkup(row_width=1)
     for guide_id, guide in PRACTICES.items():
@@ -279,7 +289,7 @@ def send_welcome(message):
 
 Что тебя интересует?
 • 🧪 *Тест на созависимость* (бесплатно)
-• 📚 *Гайды* — 990₽
+• 📚 *Гайды* — 7 штук (990₽)
 • 💰 *Тетрадь Деньги=Я* — премиум-продукт
 • 🧘 Практики и 📊 тесты"""
         
@@ -373,7 +383,7 @@ def callback_handler(call):
         bot.edit_message_text("📊 *Доступные тесты:*", call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=tests_menu())
     
     elif call.data == "category_guides":
-        bot.edit_message_text("📚 *Все гайды (6):*", call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=guides_menu())
+        bot.edit_message_text("📚 *Все гайды (7):*", call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=guides_menu())
     
     # ПРАКТИКИ/ТЕСТЫ
     elif call.data.startswith('item_'):
@@ -418,7 +428,7 @@ def callback_handler(call):
             
             bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=markup)
     
-    # НОВЫЙ ПРОДУКТ — ТЕТРАДЬ
+    # ТЕТРАДЬ
     elif call.data == "notebook_money":
         product = PRACTICES.get('money_notebook')
         
