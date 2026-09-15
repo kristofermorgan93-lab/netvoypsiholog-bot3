@@ -1,9 +1,13 @@
 import telebot
 from telebot import types
-import time
 import os
+import sqlite3
+from datetime import datetime, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
 
+# ==================================================================
 # ТОКЕН
+# ==================================================================
 TOKEN = os.environ.get('BOT_TOKEN')
 if TOKEN is None:
     print("❌ ОШИБКА: Токен не найден!")
@@ -13,7 +17,100 @@ else:
 
 CHANNEL_ID = '@netvoipsiholog'
 
-# ===== ТЕСТ НА СОЗАВИСИМОСТЬ =====
+# ==================================================================
+# БАЗА ДАННЫХ
+# ==================================================================
+DB_PATH = os.environ.get('DB_PATH', 'bot.db')
+
+def db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            first_name TEXT,
+            first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            event_type TEXT,
+            item_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS followups_sent (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            followup_key TEXT,
+            sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(user_id, followup_key)
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def ensure_user(user_id, first_name):
+    conn = db()
+    conn.execute(
+        "INSERT OR IGNORE INTO users (user_id, first_name) VALUES (?, ?)",
+        (user_id, first_name)
+    )
+    conn.commit()
+    conn.close()
+
+def log_event(user_id, event_type, item_id=None):
+    conn = db()
+    conn.execute(
+        "INSERT INTO events (user_id, event_type, item_id) VALUES (?, ?, ?)",
+        (user_id, event_type, item_id)
+    )
+    conn.commit()
+    conn.close()
+
+def has_event(user_id, event_type, item_id=None, since=None):
+    conn = db()
+    q = "SELECT 1 FROM events WHERE user_id=? AND event_type=?"
+    params = [user_id, event_type]
+    if item_id:
+        q += " AND item_id=?"
+        params.append(item_id)
+    if since:
+        q += " AND created_at >= ?"
+        params.append(since)
+    row = conn.execute(q, params).fetchone()
+    conn.close()
+    return row is not None
+
+def already_sent(user_id, followup_key):
+    conn = db()
+    row = conn.execute(
+        "SELECT 1 FROM followups_sent WHERE user_id=? AND followup_key=?",
+        (user_id, followup_key)
+    ).fetchone()
+    conn.close()
+    return row is not None
+
+def mark_sent(user_id, followup_key):
+    conn = db()
+    conn.execute(
+        "INSERT OR IGNORE INTO followups_sent (user_id, followup_key) VALUES (?, ?)",
+        (user_id, followup_key)
+    )
+    conn.commit()
+    conn.close()
+
+# ==================================================================
+# ТЕСТ НА СОЗАВИСИМОСТЬ
+# ==================================================================
 QUESTIONS = [
     "Я часто беру ответственность за чувства других людей",
     "Мне трудно сказать 'нет', даже когда не хочется что-то делать",
@@ -65,112 +162,66 @@ RESULTS = {
     }
 }
 
-# ===== ВСЕ ПРОДУКТЫ =====
+# ==================================================================
+# ВСЕ ПРОДУКТЫ
+# ==================================================================
 PRACTICES = {
-    # ПРАКТИКИ
-    'letter_to_mother': {
-        'name': '👩‍🍼 Письмо матери',
-        'link': 'https://t.me/netvoipsiholog/25',
-        'category': 'practices'
-    },
-    'transformation_map': {
-        'name': '🧭 Карта Трансформации',
-        'link': 'https://t.me/netvoipsiholog/30',
-        'category': 'practices'
-    },
-    'year_closure': {
-        'name': '📅 Закрытие года',
-        'link': 'https://t.me/c/3218564921/14',
-        'category': 'practices'
-    },
-    'shadow_diary': {
-        'name': '🖤 Дневник тени',
-        'link': 'https://t.me/netvoipsiholog/24',
-        'category': 'practices'
-    },
-    'letter_to_father': {
-        'name': '👨‍🍼 Письмо отцу',
-        'link': 'https://t.me/netvoipsiholog/32',
-        'category': 'practices'
-    },
-    'neuro_reboot': {
-        'name': '⚡ Нейропереворот',
-        'link': 'https://t.me/netvoipsiholog/33',
-        'category': 'practices'
-    },
-    
-    # ТЕСТЫ
-    'ready_for_relations': {
-        'name': '❤️ Готов ли ты к здоровым отношениям?',
-        'link': 'https://t.me/netvoipsiholog/26',
-        'category': 'tests'
-    },
-    'rejection_trauma': {
-        'name': '🚫 Травма отвержения',
-        'link': 'https://t.me/netvoipsiholog/53',
-        'category': 'tests'
-    },
-    'attachment_type': {
-        'name': '🔗 Тип привязанности',
-        'link': 'https://t.me/netvoipsiholog/75',
-        'category': 'tests'
-    },
-    
-    # ===== ГАЙДЫ (6) =====
+    'letter_to_mother': {'name': '👩‍🍼 Письмо матери', 'link': 'https://t.me/netvoipsiholog/25', 'category': 'practices'},
+    'transformation_map': {'name': '🧭 Карта Трансформации', 'link': 'https://t.me/netvoipsiholog/30', 'category': 'practices'},
+    'year_closure': {'name': '📅 Закрытие года', 'link': 'https://t.me/c/3218564921/14', 'category': 'practices'},
+    'shadow_diary': {'name': '🖤 Дневник тени', 'link': 'https://t.me/netvoipsiholog/24', 'category': 'practices'},
+    'letter_to_father': {'name': '👨‍🍼 Письмо отцу', 'link': 'https://t.me/netvoipsiholog/32', 'category': 'practices'},
+    'neuro_reboot': {'name': '⚡ Нейропереворот', 'link': 'https://t.me/netvoipsiholog/33', 'category': 'practices'},
+
+    'ready_for_relations': {'name': '❤️ Готов ли ты к здоровым отношениям?', 'link': 'https://t.me/netvoipsiholog/26', 'category': 'tests'},
+    'rejection_trauma': {'name': '🚫 Травма отвержения', 'link': 'https://t.me/netvoipsiholog/53', 'category': 'tests'},
+    'attachment_type': {'name': '🔗 Тип привязанности', 'link': 'https://t.me/netvoipsiholog/75', 'category': 'tests'},
+
     'codependency_guide': {
-        'name': '📘 Выход из созависимости',
-        'category': 'guides',
+        'name': '📘 Выход из созависимости', 'category': 'guides',
         'description': '📘 *Гайд «5 шагов выхода из созависимости»*\n\nТвой путь к свободе и здоровым отношениям.\n\n✅ PDF-гайд (20 страниц)\n✅ Аудиомедитация «Освобождение»\n✅ Дневник прогресса\n✅ Скрипты разговоров\n\n💰 *Цена: 990₽*\n\nПосле оплаты материалы выдаются в Telegram-группе',
         'prodamus': 'https://payform.ru/7tbZAPa/',
         'boosty': 'https://boosty.to/evgeniy_getman/posts/0b9dddb2-3b0b-45e8-9caa-e5f395c850cb?share=post_link',
         'group_link': 'https://t.me/+aZxoSirTo6Y2ZDJi'
     },
     'antiprocrastination': {
-        'name': '⏳ Антипрокрастинация',
-        'category': 'guides',
+        'name': '⏳ Антипрокрастинация', 'category': 'guides',
         'description': '⏳ *Гайд «Антипрокрастинация»*\n\nПерестань откладывать жизнь на потом.\n\n✅ PDF-гайд с техниками\n✅ Чек-лист «Мои победы»\n\n💰 *Цена: 990₽*\n\nПосле оплаты материалы выдаются в Telegram-группе',
         'prodamus': 'https://payform.ru/5cbZALH/',
         'boosty': 'https://boosty.to/evgeniy_getman/posts/886b6d7f-b500-478a-ae9f-96f0c7f375bd?share=post_link',
         'group_link': 'https://t.me/+ZHEiYXGSRJE5MDJi'
     },
     'antianxiety': {
-        'name': '🌿 Антитревога',
-        'category': 'guides',
+        'name': '🌿 Антитревога', 'category': 'guides',
         'description': '🌿 *Гайд «Антитревога»*\n\nПерестань жить в постоянном напряжении.\n\n✅ PDF-гайд с техниками\n\n💰 *Цена: 990₽*\n\nПосле оплаты материалы выдаются в Telegram-группе',
         'prodamus': 'https://payform.ru/s9bZAJT/',
         'boosty': 'https://boosty.to/evgeniy_getman/posts/eca8a389-c989-4a1b-b5c5-b047f860a998?share=post_link',
         'group_link': 'https://t.me/+jKd96l7sxHRiOGYy'
     },
     'selfesteem': {
-        'name': '💪 Самооценка',
-        'category': 'guides',
+        'name': '💪 Самооценка', 'category': 'guides',
         'description': '💪 *Гайд «Самооценка»*\n\nПерестань сомневаться в себе.\n\n✅ PDF-гайд\n✅ Чек-лист «Опора на себя»\n\n💰 *Цена: 990₽*\n\nПосле оплаты материалы выдаются в Telegram-группе',
         'prodamus': 'https://payform.ru/ojbZAHV/',
         'boosty': 'https://boosty.to/evgeniy_getman/posts/f9c900b1-5e28-4a42-888d-cc12b9af50dd?share=post_link',
         'group_link': 'https://t.me/+tHhnbOtl3jRjNGUy'
     },
     'narcissist': {
-        'name': '🔍 Нарцисс: как распознать',
-        'category': 'guides',
+        'name': '🔍 Нарцисс: как распознать', 'category': 'guides',
         'description': '🔍 *Гайд «Нарцисс: как распознать и не влюбиться»*\n\nКак не попасть в ловушку обаяния и не потерять себя.\n\n✅ PDF-гайд с признаками нарцисса\n✅ Чек-лист «Красные флаги»\n✅ Техники выхода из отношений с нарциссом\n\n💰 *Цена: 990₽*\n\nПосле оплаты материалы выдаются в Telegram-группе',
         'prodamus': 'https://payform.ru/hfbZAE8/',
         'boosty': 'https://boosty.to/evgeniy_getman/posts/9a7d13bc-e4db-4bdf-8db3-7e4be8caf6e3?share=post_link',
         'group_link': 'https://t.me/+dvM830sJgR40YTFi'
     },
     'boundaries': {
-        'name': '🛡️ Границы',
-        'category': 'guides',
+        'name': '🛡️ Границы', 'category': 'guides',
         'description': '🛡️ *Гайд «Границы»*\n\nКак говорить «нет» без чувства вины.\n\n✅ PDF-гайд с техниками\n✅ Чек-лист «Мои границы»\n✅ Скрипты разговоров\n\n💰 *Цена: 990₽*\n\nПосле оплаты материалы выдаются в Telegram-группе',
         'prodamus': 'https://payform.ru/8dbZAzj/',
         'boosty': 'https://boosty.to/evgeniy_getman/posts/0c85e8df-7271-4f5f-a186-fa9e9618dc63?share=post_link',
         'group_link': 'https://t.me/+OjKcFbdPqaoyMGUy'
     },
-    
-    # ===== НОВЫЙ ПРАКТИКУМ «ТЕНЬ» =====
     'shadow_practicum': {
-        'name': '🗝️ Тень. Глубокое погружение',
-        'category': 'practicums',
-        'description': """🗝️ *Практикум «Тень. Глубокое погружение»*
+        'name': '🗝️ Тень: глубокое погружение', 'category': 'practicums',
+        'description': """🗝️ *Практикум «Тень: глубокое погружение»*
 
 Как перестать бороться с собой и присвоить свою силу.
 
@@ -191,11 +242,8 @@ PRACTICES = {
         'boosty': 'https://boosty.to/evgeniy_getman/posts/a097b699-d717-440c-9fde-b38d4d15e832?share=post_link',
         'group_link': 'https://t.me/+xahqAkcA8dRiNTMy'
     },
-    
-    # ===== ТЕТРАДЬ «ДЕНЬГИ=Я» =====
     'money_notebook': {
-        'name': '💰 Деньги = Я',
-        'category': 'notebook',
+        'name': '💰 Деньги = Я', 'category': 'notebook',
         'description': """💰 *Тетрадь-практикум «Деньги = Я»*
 
 Твой личный финансовый дневник. 30 дней практик, чтобы перестать бояться денег, наладить отношения с финансами и начать зарабатывать больше.
@@ -213,16 +261,33 @@ PRACTICES = {
 💰 *Цена: 2490₽*
 
 После оплаты материалы выдаются в Telegram-группе""",
-        'prodamus': 'https://payform.ru/ijc6dWJ/',
+        'prodamus': 'https://payform.ru/ihcz147/',
         'boosty': 'https://boosty.to/evgeniy_getman/posts/f78172f4-c4ae-4c42-8d10-a35960a88351?share=post_link',
         'group_link': 'https://t.me/+mzldZA7y5X8wYTli'
     }
 }
 
+# ==================================================================
+# КАРТА: какая бесплатная практика/тест ведёт к какому платному
+# ==================================================================
+FREE_TO_PAID = {
+    'shadow_diary': 'shadow_practicum',
+    'letter_to_mother': 'shadow_practicum',
+    'letter_to_father': 'shadow_practicum',
+    'transformation_map': 'shadow_practicum',
+    'neuro_reboot': 'antiprocrastination',
+    'year_closure': 'shadow_practicum',
+    'ready_for_relations': 'boundaries',
+    'rejection_trauma': 'narcissist',
+    'attachment_type': 'boundaries',
+}
+
 bot = telebot.TeleBot(TOKEN)
 user_sessions = {}
 
-# ===== ПРОВЕРКА ПОДПИСКИ =====
+# ==================================================================
+# ПРОВЕРКА ПОДПИСКИ
+# ==================================================================
 def check_subscription(user_id):
     try:
         member = bot.get_chat_member(CHANNEL_ID, user_id)
@@ -230,7 +295,9 @@ def check_subscription(user_id):
     except:
         return False
 
-# ===== КНОПКИ =====
+# ==================================================================
+# КНОПКИ
+# ==================================================================
 def subscription_button():
     markup = types.InlineKeyboardMarkup()
     btn = types.InlineKeyboardButton("📢 Подписаться на канал", url=f"https://t.me/{CHANNEL_ID.replace('@', '')}")
@@ -242,7 +309,7 @@ def main_menu():
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
         types.InlineKeyboardButton("🧪 Пройти тест на созависимость", callback_data="start_test"),
-        types.InlineKeyboardButton("🗝️ Практикум Тень", callback_data="practicum_shadow"),
+        types.InlineKeyboardButton("🗝️ Тень: глубокое погружение", callback_data="practicum_shadow"),
         types.InlineKeyboardButton("📚 Все гайды", callback_data="category_guides"),
         types.InlineKeyboardButton("💰 Тетрадь Деньги=Я", callback_data="notebook_money"),
         types.InlineKeyboardButton("🧘 Практики", callback_data="category_practices"),
@@ -275,11 +342,25 @@ def guides_menu():
     markup.add(types.InlineKeyboardButton("◀️ В главное меню", callback_data="back_to_main"))
     return markup
 
-# ===== ОБРАБОТЧИКИ =====
+def payment_markup(product, back_callback, back_label):
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton("🇷🇺 Картой РФ (Prodamus)", url=product['prodamus']),
+        types.InlineKeyboardButton("🌍 Зарубежной картой (Boosty)", url=product['boosty']),
+        types.InlineKeyboardButton(back_label, callback_data=back_callback)
+    )
+    return markup
+
+# ==================================================================
+# ОБРАБОТЧИКИ
+# ==================================================================
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
+    user_id = message.from_user.id
     first_name = message.from_user.first_name
-    if check_subscription(message.from_user.id):
+    ensure_user(user_id, first_name)
+
+    if check_subscription(user_id):
         welcome_text = f"""🧭 *Навигатор*
 
 🌟 Привет, {first_name}!
@@ -288,7 +369,7 @@ def send_welcome(message):
 
 Что тебя интересует?
 • 🧪 *Тест на созависимость* (бесплатно)
-• 🗝️ *Практикум Тень* (новинка!)
+• 🗝️ *Тень: глубокое погружение* (новинка!)
 • 📚 *Гайды* — 990₽
 • 💰 *Тетрадь Деньги=Я* — 2490₽
 • 🧘 Практики и 📊 тесты"""
@@ -304,16 +385,16 @@ def send_welcome(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     user_id = call.from_user.id
-    
+
     if call.data == "check_sub":
         if check_subscription(user_id):
             bot.edit_message_text("✅ Подписка подтверждена!\n\nВыбери действие:", call.message.chat.id, call.message.message_id, reply_markup=main_menu())
         else:
             bot.answer_callback_query(call.id, "❌ Подписка не найдена", show_alert=True)
-    
+
     elif call.data == "back_to_main":
         bot.edit_message_text("Выбери действие:", call.message.chat.id, call.message.message_id, reply_markup=main_menu())
-    
+
     elif call.data == "start_test":
         user_sessions[user_id] = {'question': 0, 'answers': []}
         markup = types.InlineKeyboardMarkup()
@@ -323,7 +404,7 @@ def callback_handler(call):
             types.InlineKeyboardButton("❌ Нет", callback_data="answer_0")
         )
         bot.edit_message_text(f"*Вопрос 1 из 15:*\n\n{QUESTIONS[0]}", call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=markup)
-    
+
     elif call.data.startswith("answer_"):
         score = int(call.data.split('_')[1])
         session = user_sessions.get(user_id)
@@ -355,20 +436,21 @@ def callback_handler(call):
                 )
                 bot.send_message(call.message.chat.id, "📘 *Теперь тебе нужен этот гайд*\n\n«5 шагов выхода из созависимости» — твоя пошаговая инструкция к свободе.", parse_mode='Markdown', reply_markup=markup)
                 del user_sessions[user_id]
-    
+
     elif call.data == "category_practices":
         bot.edit_message_text("🧘 *Доступные практики:*", call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=practices_menu())
-    
+
     elif call.data == "category_tests":
         bot.edit_message_text("📊 *Доступные тесты:*", call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=tests_menu())
-    
+
     elif call.data == "category_guides":
         bot.edit_message_text("📚 *Все гайды (6):*", call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=guides_menu())
-    
+
     elif call.data.startswith('item_'):
         item_id = call.data.replace('item_', '')
         item = PRACTICES.get(item_id)
         if item:
+            log_event(user_id, 'viewed_free', item_id)
             cat_icon = "🧘" if item['category'] == 'practices' else "📊"
             cat_text = "практике" if item['category'] == 'practices' else "тесте"
             text = f"""{cat_icon} *{item['name']}*
@@ -381,45 +463,32 @@ def callback_handler(call):
                 markup.add(types.InlineKeyboardButton("◀️ К тестам", callback_data="category_tests"))
             markup.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main"))
             bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown', disable_web_page_preview=False, reply_markup=markup)
-    
+
     elif call.data.startswith('guide_'):
         gid = call.data.replace('guide_', '')
         g = PRACTICES.get(gid)
         if g:
+            log_event(user_id, 'clicked_pay', gid)
             text = f"""{g['description']}\n\n👇 Выбери способ оплаты:"""
-            markup = types.InlineKeyboardMarkup(row_width=1)
-            markup.add(
-                types.InlineKeyboardButton("🇷🇺 Картой РФ (Prodamus)", url=g['prodamus']),
-                types.InlineKeyboardButton("🌍 Зарубежной картой (Boosty)", url=g['boosty']),
-                types.InlineKeyboardButton("◀️ Ко всем гайдам", callback_data="category_guides")
-            )
-            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=markup)
-    
-    # ===== НОВЫЙ ПРАКТИКУМ «ТЕНЬ» =====
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown',
+                                   reply_markup=payment_markup(g, "category_guides", "◀️ Ко всем гайдам"))
+
     elif call.data == "practicum_shadow":
         product = PRACTICES.get('shadow_practicum')
         if product:
+            log_event(user_id, 'clicked_pay', 'shadow_practicum')
             text = f"""{product['description']}\n\n👇 Выбери способ оплаты:"""
-            markup = types.InlineKeyboardMarkup(row_width=1)
-            markup.add(
-                types.InlineKeyboardButton("🇷🇺 Картой РФ (Prodamus)", url=product['prodamus']),
-                types.InlineKeyboardButton("🌍 Зарубежной картой (Boosty)", url=product['boosty']),
-                types.InlineKeyboardButton("◀️ В главное меню", callback_data="back_to_main")
-            )
-            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=markup)
-    
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown',
+                                   reply_markup=payment_markup(product, "back_to_main", "◀️ В главное меню"))
+
     elif call.data == "notebook_money":
         product = PRACTICES.get('money_notebook')
         if product:
+            log_event(user_id, 'clicked_pay', 'money_notebook')
             text = f"""{product['description']}\n\n👇 Выбери способ оплаты:"""
-            markup = types.InlineKeyboardMarkup(row_width=1)
-            markup.add(
-                types.InlineKeyboardButton("🇷🇺 Картой РФ (Prodamus)", url=product['prodamus']),
-                types.InlineKeyboardButton("🌍 Зарубежной картой (Boosty)", url=product['boosty']),
-                types.InlineKeyboardButton("◀️ В главное меню", callback_data="back_to_main")
-            )
-            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=markup)
-    
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown',
+                                   reply_markup=payment_markup(product, "back_to_main", "◀️ В главное меню"))
+
     elif call.data == "info":
         info_text = """ℹ️ *О канале*
 Это пространство для твоего роста.
@@ -431,7 +500,103 @@ def callback_handler(call):
         )
         bot.edit_message_text(info_text, call.message.chat.id, call.message.message_id, parse_mode='Markdown', reply_markup=markup)
 
-# ===== ЗАПУСК =====
+    elif call.data.startswith('confirm_paid_'):
+        item_id = call.data.replace('confirm_paid_', '')
+        log_event(user_id, 'confirmed_purchase', item_id)
+        bot.answer_callback_query(call.id, "Спасибо! 🙌")
+        bot.send_message(
+            call.message.chat.id,
+            "Здорово, что вы уже внутри! Если что-то будет непонятно по материалам — просто напишите сюда в бот."
+        )
+
+    elif call.data.startswith('not_paid_'):
+        bot.answer_callback_query(call.id, "Хорошо, понял 🙂")
+
+# ==================================================================
+# АВТОВОРОНКА: отложенные сообщения
+# ==================================================================
+def run_followups():
+    now = datetime.utcnow()
+
+    since_24h = now - timedelta(hours=24)
+    conn = db()
+    rows = conn.execute("""
+        SELECT DISTINCT user_id, item_id FROM events
+        WHERE event_type = 'viewed_free' AND created_at <= ?
+    """, (since_24h,)).fetchall()
+    conn.close()
+
+    for row in rows:
+        user_id, free_item_id = row['user_id'], row['item_id']
+        paid_item_id = FREE_TO_PAID.get(free_item_id)
+        if not paid_item_id:
+            continue
+        followup_key = f"nudge24_{free_item_id}"
+        if already_sent(user_id, followup_key):
+            continue
+        if has_event(user_id, 'clicked_pay', paid_item_id):
+            continue
+
+        product = PRACTICES.get(paid_item_id)
+        if not product:
+            continue
+        try:
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            markup.add(types.InlineKeyboardButton(f"Узнать про «{product['name']}»", callback_data=f"guide_{paid_item_id}" if product['category'] == 'guides' else ("practicum_shadow" if paid_item_id == 'shadow_practicum' else "notebook_money")))
+            bot.send_message(
+                user_id,
+                f"Как продвигается практика? Если тема откликается — можно пойти глубже: *{product['name']}*.",
+                parse_mode='Markdown',
+                reply_markup=markup
+            )
+            mark_sent(user_id, followup_key)
+        except Exception as e:
+            print(f"⚠️ Не смог отправить nudge24 юзеру {user_id}: {e}")
+
+    since_2h = now - timedelta(hours=2)
+    conn = db()
+    rows = conn.execute("""
+        SELECT DISTINCT user_id, item_id FROM events
+        WHERE event_type = 'clicked_pay' AND created_at <= ?
+    """, (since_2h,)).fetchall()
+    conn.close()
+
+    for row in rows:
+        user_id, item_id = row['user_id'], row['item_id']
+        followup_key = f"confirm_{item_id}"
+        if already_sent(user_id, followup_key):
+            continue
+        if has_event(user_id, 'confirmed_purchase', item_id):
+            continue
+
+        product = PRACTICES.get(item_id)
+        if not product:
+            continue
+        try:
+            markup = types.InlineKeyboardMarkup(row_width=1)
+            markup.add(
+                types.InlineKeyboardButton("✅ Да, оплатил(а)", callback_data=f"confirm_paid_{item_id}"),
+                types.InlineKeyboardButton("Пока нет", callback_data=f"not_paid_{item_id}")
+            )
+            bot.send_message(
+                user_id,
+                f"Получилось оплатить «{product['name']}»? Если да — жду подтверждения, чтобы не писать зря 🙂",
+                reply_markup=markup
+            )
+            mark_sent(user_id, followup_key)
+        except Exception as e:
+            print(f"⚠️ Не смог отправить confirm юзеру {user_id}: {e}")
+
+
+# ==================================================================
+# ЗАПУСК
+# ==================================================================
 if __name__ == '__main__':
-    print("🚀 Бот с практикумом «Тень» запущен...")
+    init_db()
+
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(run_followups, 'interval', minutes=30)
+    scheduler.start()
+
+    print("🚀 Бот с практикумом «Тень: глубокое погружение» и автоворонкой запущен...")
     bot.infinity_polling()
